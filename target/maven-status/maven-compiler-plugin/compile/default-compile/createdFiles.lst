@@ -1,0 +1,6 @@
+com/classroom/docmanager/App.class
+com/classroom/docmanager/service/StudentDocumentManager.class
+com/classroom/docmanager/config/AwsConfig.class
+com/classroom/docmanager/service/BlobStoreService.class
+com/classroom/docmanager/model/Document.class
+com/classroom/docmanager/service/DocumentMetadataService.class
