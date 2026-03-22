@@ -2,7 +2,6 @@ package com.classroom.docmanager.model;
 
 /**
  * Plain POJO representing a student document's metadata.
- * No framework annotations — manual mapping to/from DynamoDB attribute maps.
  */
 public class Document {
 
@@ -50,7 +49,7 @@ public class Document {
 
     @Override
     public String toString() {
-        return "Document{studentId='%s', documentId='%s', fileName='%s', size=%d}"
-                .formatted(studentId, documentId, fileName, fileSizeBytes);
+        return String.format("Document{studentId='%s', documentId='%s', fileName='%s', size=%d}",
+                studentId, documentId, fileName, fileSizeBytes);
     }
 }

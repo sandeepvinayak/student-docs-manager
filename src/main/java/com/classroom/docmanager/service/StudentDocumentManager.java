@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * High-level orchestrator that coordinates S3 (blobstore) and DynamoDB operations.
+ * High-level orchestrator that coordinates Blob storage and DocStore operations.
  * This is the main entry point for business logic.
  */
 public class StudentDocumentManager {
@@ -29,25 +29,25 @@ public class StudentDocumentManager {
 
     /**
      * Upload a student's assignment file:
-     *  1. Upload the file to S3 under students/{studentId}/{uuid}_{filename}
-     *  2. Save metadata to DynamoDB
+     *  1. Upload the file to blob storage under students/{studentId}/{uuid}_{filename}
+     *  2. Save metadata to DocStore
      */
     public Document uploadAssignment(String studentId, Path filePath) throws IOException {
         String fileName = filePath.getFileName().toString();
         String documentId = UUID.randomUUID().toString();
-        String s3Key = "students/%s/%s_%s".formatted(studentId, documentId, fileName);
+        String blobKey = String.format("students/%s/%s_%s", studentId, documentId, fileName);
         String contentType = Files.probeContentType(filePath);
         long fileSize = Files.size(filePath);
 
-        // Step 1: Upload to S3
-        blobStore.uploadFile(s3Key, filePath, contentType != null ? contentType : "application/octet-stream");
+        // Step 1: Upload to blob storage
+        blobStore.uploadFile(blobKey, filePath, contentType != null ? contentType : "application/octet-stream");
 
-        // Step 2: Save metadata to DynamoDB
+        // Step 2: Save metadata to DocStore
         Document doc = new Document();
         doc.setStudentId(studentId);
         doc.setDocumentId(documentId);
         doc.setFileName(fileName);
-        doc.setS3Key(s3Key);
+        doc.setS3Key(blobKey);
         doc.setFileSizeBytes(fileSize);
         doc.setContentType(contentType);
         doc.setUploadedAt(Instant.now().toString());
@@ -58,12 +58,12 @@ public class StudentDocumentManager {
         return doc;
     }
 
-    /** Download a student's document by looking up the S3 key in DynamoDB. */
+    /** Download a student's document by looking up the blob key in DocStore. */
     public byte[] downloadAssignment(String studentId, String documentId) {
         Document doc = metadataService.getDocument(studentId, documentId);
         if (doc == null) {
             throw new IllegalArgumentException(
-                    "No document found for student=%s, doc=%s".formatted(studentId, documentId));
+                    String.format("No document found for student=%s, doc=%s", studentId, documentId));
         }
         return blobStore.downloadFile(doc.getS3Key());
     }
@@ -73,7 +73,7 @@ public class StudentDocumentManager {
         return metadataService.listDocumentsByStudent(studentId);
     }
 
-    /** Delete a student's document from both S3 and DynamoDB. */
+    /** Delete a student's document from both blob storage and DocStore. */
     public void deleteAssignment(String studentId, String documentId) {
         Document doc = metadataService.getDocument(studentId, documentId);
         if (doc != null) {

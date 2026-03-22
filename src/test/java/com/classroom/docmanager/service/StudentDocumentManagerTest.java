@@ -29,20 +29,20 @@ class StudentDocumentManagerTest {
     }
 
     @Test
-    void uploadAssignment_shouldUploadToS3AndSaveMetadata(@TempDir Path tempDir) throws IOException {
+    void uploadAssignment_shouldUploadToBlobStoreAndSaveMetadata(@TempDir Path tempDir) throws IOException {
         // Create a temp file to upload
         Path testFile = tempDir.resolve("homework.txt");
         Files.writeString(testFile, "This is my homework.");
 
         Document result = manager.uploadAssignment("stu001", testFile);
 
-        // Verify S3 upload was called
+        // Verify blob storage upload was called
         verify(blobStore).uploadFile(
                 contains("students/stu001/"),
                 eq(testFile),
                 anyString());
 
-        // Verify DynamoDB save was called with correct metadata
+        // Verify DocStore save was called with correct metadata
         ArgumentCaptor<Document> docCaptor = ArgumentCaptor.forClass(Document.class);
         verify(metadataService).saveDocument(docCaptor.capture());
 
@@ -96,7 +96,7 @@ class StudentDocumentManagerTest {
     }
 
     @Test
-    void deleteAssignment_shouldDeleteFromBothS3AndDynamoDB() {
+    void deleteAssignment_shouldDeleteFromBothBlobStoreAndDocStore() {
         Document doc = new Document();
         doc.setStudentId("stu001");
         doc.setDocumentId("doc123");
