@@ -10,38 +10,34 @@
     <packaging>jar</packaging>
 
     <name>Student Document Manager</name>
-    <description>Classroom project: Manage student documents with S3 and DynamoDB</description>
+    <description>Classroom project: Manage student documents with the Substrate SDK (blob + docstore)</description>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <aws.sdk.version>2.25.16</aws.sdk.version>
+        <multicloudj.version>0.4.11</multicloudj.version>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>software.amazon.awssdk</groupId>
-                <artifactId>bom</artifactId>
-                <version>${aws.sdk.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
     <dependencies>
-        <!-- AWS SDK v2: S3 -->
+        <!-- Substrate SDK (multicloudj): substrate-neutral blob + docstore clients -->
         <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>s3</artifactId>
+            <groupId>com.salesforce.multicloudj</groupId>
+            <artifactId>blob-client</artifactId>
+            <version>${multicloudj.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.salesforce.multicloudj</groupId>
+            <artifactId>docstore-client</artifactId>
+            <version>${multicloudj.version}</version>
         </dependency>
 
-        <!-- AWS SDK v2: DynamoDB -->
+        <!-- In-memory blob provider for unit tests -->
         <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>dynamodb</artifactId>
+            <groupId>com.salesforce.multicloudj</groupId>
+            <artifactId>blob-inmemory</artifactId>
+            <version>${multicloudj.version}</version>
+            <scope>test</scope>
         </dependency>
 
         <!-- SLF4J + Logback for logging -->
@@ -67,6 +63,47 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <!-- Substrate provider implementations are selected at build time: mvn package -Paws | -Pgcp -->
+    <profiles>
+        <profile>
+            <id>aws</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.salesforce.multicloudj</groupId>
+                    <artifactId>blob-aws</artifactId>
+                    <version>${multicloudj.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.salesforce.multicloudj</groupId>
+                    <artifactId>docstore-aws</artifactId>
+                    <version>${multicloudj.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>gcp</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.salesforce.multicloudj</groupId>
+                    <artifactId>blob-gcp</artifactId>
+                    <version>${multicloudj.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.salesforce.multicloudj</groupId>
+                    <artifactId>docstore-gcp-firestore</artifactId>
+                    <version>${multicloudj.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 
     <build>
         <plugins>

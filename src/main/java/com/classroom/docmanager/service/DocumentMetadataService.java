@@ -1,113 +1,77 @@
 package com.classroom.docmanager.service;
 
 import com.classroom.docmanager.model.Document;
+import com.salesforce.multicloudj.docstore.client.DocStoreClient;
+import com.salesforce.multicloudj.docstore.driver.DocumentIterator;
+import com.salesforce.multicloudj.docstore.driver.FilterOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.*;
 
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
- * Handles all interactions with DynamoDB for document metadata.
- * Uses the low-level DynamoDB client with raw attribute maps — no Enhanced Client or beans.
+ * Handles all interactions with the document store for document metadata.
+ * Uses the Substrate SDK DocStoreClient; the Document POJO's field names map 1:1 to the stored
+ * attributes (partition key: studentId, sort key: documentId).
  */
 public class DocumentMetadataService {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentMetadataService.class);
-    private static final String TABLE_NAME = "StudentDocuments";
 
-    private final DynamoDbClient dynamoDb;
+    public static final String TABLE_NAME = "StudentDocuments";
+    public static final String PARTITION_KEY = "studentId";
+    public static final String SORT_KEY = "documentId";
 
-    public DocumentMetadataService(DynamoDbClient dynamoDb) {
-        this.dynamoDb = dynamoDb;
+    private final DocStoreClient docStore;
+
+    public DocumentMetadataService(DocStoreClient docStore) {
+        this.docStore = docStore;
     }
 
     /** Save or update document metadata. */
     public void saveDocument(Document doc) {
-        Map<String, AttributeValue> item = toAttributeMap(doc);
-        dynamoDb.putItem(PutItemRequest.builder()
-                .tableName(TABLE_NAME)
-                .item(item)
-                .build());
+        docStore.put(new com.salesforce.multicloudj.docstore.driver.Document(doc));
         log.info("Saved metadata: {}", doc);
     }
 
     /** Get a single document by studentId + documentId. */
     public Document getDocument(String studentId, String documentId) {
-        Map<String, AttributeValue> key = Map.of(
-                "studentId", AttributeValue.builder().s(studentId).build(),
-                "documentId", AttributeValue.builder().s(documentId).build());
+        Document doc = keyOnly(studentId, documentId);
+        docStore.get(new com.salesforce.multicloudj.docstore.driver.Document(doc));
 
-        GetItemResponse response = dynamoDb.getItem(GetItemRequest.builder()
-                .tableName(TABLE_NAME)
-                .key(key)
-                .build());
-
-        if (!response.hasItem() || response.item().isEmpty()) {
+        // get() leaves the input untouched when no item matches the key
+        if (doc.getUploadedAt() == null) {
             return null;
         }
-        return fromAttributeMap(response.item());
+        return doc;
     }
 
     /** List all documents for a given student. */
     public List<Document> listDocumentsByStudent(String studentId) {
-        Map<String, AttributeValue> expressionValues = Map.of(
-                ":sid", AttributeValue.builder().s(studentId).build());
+        DocumentIterator it = docStore.query()
+                .where(PARTITION_KEY, FilterOperation.EQUAL, studentId)
+                .get();
 
-        QueryResponse response = dynamoDb.query(QueryRequest.builder()
-                .tableName(TABLE_NAME)
-                .keyConditionExpression("studentId = :sid")
-                .expressionAttributeValues(expressionValues)
-                .build());
-
-        return response.items().stream()
-                .map(DocumentMetadataService::fromAttributeMap)
-                .toList();
+        List<Document> results = new ArrayList<>();
+        while (it.hasNext()) {
+            Document doc = new Document();
+            it.next(new com.salesforce.multicloudj.docstore.driver.Document(doc));
+            results.add(doc);
+        }
+        return results;
     }
 
     /** Delete a document's metadata. */
     public void deleteDocument(String studentId, String documentId) {
-        Map<String, AttributeValue> key = Map.of(
-                "studentId", AttributeValue.builder().s(studentId).build(),
-                "documentId", AttributeValue.builder().s(documentId).build());
-
-        dynamoDb.deleteItem(DeleteItemRequest.builder()
-                .tableName(TABLE_NAME)
-                .key(key)
-                .build());
+        docStore.delete(new com.salesforce.multicloudj.docstore.driver.Document(keyOnly(studentId, documentId)));
         log.info("Deleted metadata for student={}, doc={}", studentId, documentId);
     }
 
-    // --- Manual mapping between Document and DynamoDB attribute maps ---
-
-    private static Map<String, AttributeValue> toAttributeMap(Document doc) {
-        Map<String, AttributeValue> item = new HashMap<>();
-        item.put("studentId", AttributeValue.builder().s(doc.getStudentId()).build());
-        item.put("documentId", AttributeValue.builder().s(doc.getDocumentId()).build());
-        item.put("fileName", AttributeValue.builder().s(doc.getFileName()).build());
-        item.put("s3Key", AttributeValue.builder().s(doc.getS3Key()).build());
-        item.put("fileSizeBytes", AttributeValue.builder().n(String.valueOf(doc.getFileSizeBytes())).build());
-        item.put("uploadedAt", AttributeValue.builder().s(doc.getUploadedAt()).build());
-        if (doc.getContentType() != null) {
-            item.put("contentType", AttributeValue.builder().s(doc.getContentType()).build());
-        }
-        return item;
-    }
-
-    private static Document fromAttributeMap(Map<String, AttributeValue> item) {
+    private static Document keyOnly(String studentId, String documentId) {
         Document doc = new Document();
-        doc.setStudentId(item.get("studentId").s());
-        doc.setDocumentId(item.get("documentId").s());
-        doc.setFileName(item.get("fileName").s());
-        doc.setS3Key(item.get("s3Key").s());
-        doc.setFileSizeBytes(Long.parseLong(item.get("fileSizeBytes").n()));
-        doc.setUploadedAt(item.get("uploadedAt").s());
-        if (item.containsKey("contentType")) {
-            doc.setContentType(item.get("contentType").s());
-        }
+        doc.setStudentId(studentId);
+        doc.setDocumentId(documentId);
         return doc;
     }
 }

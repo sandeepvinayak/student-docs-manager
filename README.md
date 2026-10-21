@@ -1,6 +1,6 @@
 # Student Document Manager
 
-A small classroom project that demonstrates **Amazon S3** (blobstore) and **Amazon DynamoDB** integration in Java using AWS SDK v2. Upload student assignment files to S3 and track metadata in DynamoDB.
+A small classroom project that demonstrates blob storage and document store integration in Java using the **Substrate SDK** ([multicloudj](https://opensource.salesforce.com/multicloudj/)). Upload student assignment files to a bucket and track metadata in a document store. On the default `aws` substrate these are **Amazon S3** and **Amazon DynamoDB**.
 
 ## How It Works
 
@@ -59,9 +59,14 @@ Your credentials need:
 # Run tests
 mvn clean test
 
-# Build the fat JAR
+# Build the fat JAR (default substrate profile: aws)
 mvn clean package
+
+# Build for another substrate
+mvn clean package -Pgcp
 ```
+
+At runtime the substrate is chosen with `SUBSTRATE_PROVIDER` (default `aws`) and `SUBSTRATE_REGION` (default `us-west-2`). It must match the Maven profile the JAR was built with.
 
 ## Run the Demo
 
@@ -141,21 +146,23 @@ The homework file is gone from both S3 and DynamoDB. Only the essay remains.
 src/main/java/com/classroom/docmanager/
 ├── App.java                              # CLI entry point (parses args, runs commands)
 ├── config/
-│   └── AwsConfig.java                    # AWS client factory (S3, DynamoDB)
+│   └── SubstrateConfig.java              # Substrate SDK client factory (BucketClient, DocStoreClient)
 ├── model/
 │   └── Document.java                     # Plain POJO for document metadata
 └── service/
-    ├── BlobStoreService.java             # S3 operations (upload/download/list/delete)
-    ├── DocumentMetadataService.java      # DynamoDB CRUD using low-level client
+    ├── BlobStoreService.java             # Blob operations via BucketClient (upload/download/list/delete)
+    ├── DocumentMetadataService.java      # Metadata CRUD + query via DocStoreClient
     └── StudentDocumentManager.java       # Orchestrates S3 + DynamoDB together
 
 src/test/java/
+├── BlobStoreServiceTest.java             # BucketClient against the in-memory provider (3 tests)
+├── DocumentMetadataServiceTest.java      # DocStoreClient mocked with Mockito (5 tests)
 └── StudentDocumentManagerTest.java       # Unit tests with Mockito (6 tests)
 ```
 
 ## Tech Stack
 
 - Java 17, Maven
-- AWS SDK v2 (`s3`, `dynamodb`) — low-level client, no beans/annotations
+- Substrate SDK / multicloudj 0.4.11 (`blob-client`, `docstore-client`; provider jars selected via Maven profile)
 - SLF4J + Logback
 - JUnit 5 + Mockito
