@@ -1,6 +1,6 @@
 package com.classroom.docmanager;
 
-import com.classroom.docmanager.config.AwsConfig;
+import com.classroom.docmanager.config.SubstrateConfig;
 import com.classroom.docmanager.model.Document;
 import com.classroom.docmanager.service.BlobStoreService;
 import com.classroom.docmanager.service.DocumentMetadataService;
@@ -31,8 +31,8 @@ public class App {
             System.exit(1);
         }
 
-        var blobStore = new BlobStoreService(AwsConfig.s3Client(), BUCKET_NAME);
-        var metadataService = new DocumentMetadataService(AwsConfig.dynamoDbClient());
+        var blobStore = new BlobStoreService(SubstrateConfig.bucketClient(BUCKET_NAME));
+        var metadataService = new DocumentMetadataService(SubstrateConfig.docStoreClient());
         var manager = new StudentDocumentManager(blobStore, metadataService);
 
         String command = args[0].toLowerCase();

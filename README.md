@@ -1,11 +1,25 @@
 # Student Document Manager
 
-A small classroom project that demonstrates **Amazon S3** (blobstore) and **Amazon DynamoDB** integration in Java using AWS SDK v2. Upload student assignment files to S3 and track metadata in DynamoDB.
+A small classroom project that stores student assignment files in a **blob store** and tracks their metadata in a **document store**. It is substrate-agnostic: it uses the [Substrate SDK (multicloudj)](https://opensource.salesforce.com/multicloudj/), so the same code runs on AWS (S3 + DynamoDB), GCP (GCS + Firestore), or Alibaba (OSS + Tablestore).
 
 ## How It Works
 
-- **S3** stores files under `students/{studentId}/{uuid}_{filename}`
-- **DynamoDB** table `StudentDocuments` stores metadata (partition key: `studentId`, sort key: `documentId`)
+- The **blob store** holds files under `students/{studentId}/{uuid}_{filename}`
+- The **document store** collection `StudentDocuments` holds metadata (partition key: `studentId`, sort key: `documentId`)
+
+## Choosing a Substrate
+
+The provider implementation is picked at **build time** with a Maven profile. The matching provider id is picked at **run time** with environment variables:
+
+| Substrate | Maven profile | `BLOB_PROVIDER` | `DOCSTORE_PROVIDER` |
+|-----------|---------------|-----------------|---------------------|
+| AWS (default) | `-Paws` | `aws` | `aws` |
+| GCP | `-Pgcp` | `gcp` | `gcp-firestore` |
+| Alibaba | `-Pali` | `ali` | `ali` |
+
+`SUBSTRATE_REGION` sets the region (default `us-west-2`). If a variable is unset, it defaults to AWS.
+
+The AWS-specific setup steps below (CLI commands, IAM) apply to the AWS substrate. On other substrates, create the equivalent bucket and collection.
 
 ## Prerequisites
 
@@ -51,7 +65,9 @@ aws dynamodb create-table \
 
 Your credentials need:
 - **S3**: `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject`, `s3:ListBucket`
-- **DynamoDB**: `dynamodb:PutItem`, `dynamodb:GetItem`, `dynamodb:Query`, `dynamodb:DeleteItem`
+- **DynamoDB**: `dynamodb:PutItem`, `dynamodb:BatchGetItem`, `dynamodb:Query`, `dynamodb:DeleteItem`, `dynamodb:DescribeTable`
+
+(The Substrate SDK reads single items with `BatchGetItem`, and it calls `DescribeTable` to plan queries.)
 
 ## Build
 
@@ -59,7 +75,7 @@ Your credentials need:
 # Run tests
 mvn clean test
 
-# Build the fat JAR
+# Build the fat JAR (AWS by default; use -Pgcp or -Pali for other substrates)
 mvn clean package
 ```
 
@@ -133,7 +149,7 @@ java -jar $JAR list stu001
 #   [b7e2c3d5-...] essay.txt (25 bytes) - uploaded 2026-03-22T17:31:00Z
 ```
 
-The homework file is gone from both S3 and DynamoDB. Only the essay remains.
+The homework file is gone from both the blob store and the document store. Only the essay remains.
 
 ## Project Structure
 
@@ -141,21 +157,23 @@ The homework file is gone from both S3 and DynamoDB. Only the essay remains.
 src/main/java/com/classroom/docmanager/
 ├── App.java                              # CLI entry point (parses args, runs commands)
 ├── config/
-│   └── AwsConfig.java                    # AWS client factory (S3, DynamoDB)
+│   └── SubstrateConfig.java              # Substrate-neutral client factory (BucketClient, DocStoreClient)
 ├── model/
 │   └── Document.java                     # Plain POJO for document metadata
 └── service/
-    ├── BlobStoreService.java             # S3 operations (upload/download/list/delete)
-    ├── DocumentMetadataService.java      # DynamoDB CRUD using low-level client
-    └── StudentDocumentManager.java       # Orchestrates S3 + DynamoDB together
+    ├── BlobStoreService.java             # Blob operations (upload/download/list/delete)
+    ├── DocumentMetadataService.java      # Document store CRUD using raw field maps
+    └── StudentDocumentManager.java       # Orchestrates blob store + document store together
 
-src/test/java/
-└── StudentDocumentManagerTest.java       # Unit tests with Mockito (6 tests)
+src/test/java/com/classroom/docmanager/service/
+├── StudentDocumentManagerTest.java       # Orchestration tests with Mockito
+├── BlobStoreServiceTest.java             # Blob tests against the in-memory Substrate provider
+└── DocumentMetadataServiceTest.java      # Docstore mapping tests with a mocked DocStoreClient
 ```
 
 ## Tech Stack
 
 - Java 17, Maven
-- AWS SDK v2 (`s3`, `dynamodb`) — low-level client, no beans/annotations
+- Substrate SDK / multicloudj (`blob-client`, `docstore-client`, plus a provider per Maven profile)
 - SLF4J + Logback
 - JUnit 5 + Mockito
