@@ -1,74 +1,87 @@
 package com.classroom.docmanager.service;
 
+import com.salesforce.multicloudj.blob.client.BucketClient;
+import com.salesforce.multicloudj.blob.driver.BlobInfo;
+import com.salesforce.multicloudj.blob.driver.ByteArray;
+import com.salesforce.multicloudj.blob.driver.DownloadRequest;
+import com.salesforce.multicloudj.blob.driver.ListBlobsRequest;
+import com.salesforce.multicloudj.blob.driver.UploadRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.core.ResponseBytes;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.*;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 /**
- * Handles all interactions with S3 (blobstore).
+ * Handles all interactions with the blob store (Substrate SDK BucketClient).
  * Supports upload, download, list, and delete operations on student documents.
  */
 public class BlobStoreService {
 
     private static final Logger log = LoggerFactory.getLogger(BlobStoreService.class);
 
-    private final S3Client s3;
+    private final BucketClient bucketClient;
     private final String bucketName;
 
-    public BlobStoreService(S3Client s3, String bucketName) {
-        this.s3 = s3;
+    public BlobStoreService(BucketClient bucketClient, String bucketName) {
+        this.bucketClient = bucketClient;
         this.bucketName = bucketName;
     }
 
-    /** Upload a file to S3 under the given key. */
-    public void uploadFile(String s3Key, Path filePath, String contentType) {
-        PutObjectRequest request = PutObjectRequest.builder()
-                .bucket(bucketName)
-                .key(s3Key)
-                .contentType(contentType)
+    /** Upload a file to the bucket under the given key. */
+    public void uploadFile(String key, Path filePath, String contentType) {
+        long size;
+        try {
+            size = Files.size(filePath);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Unable to read file " + filePath, e);
+        }
+
+        UploadRequest request = UploadRequest.builder()
+                .withKey(key)
+                .withContentLength(size)
+                .withContentType(contentType)
                 .build();
 
-        s3.putObject(request, RequestBody.fromFile(filePath));
-        log.info("Uploaded {} -> s3://{}/{}", filePath.getFileName(), bucketName, s3Key);
+        bucketClient.upload(request, filePath);
+        log.info("Uploaded {} -> {}/{}", filePath.getFileName(), bucketName, key);
     }
 
-    /** Download a file from S3 and return its bytes. */
-    public byte[] downloadFile(String s3Key) {
-        GetObjectRequest request = GetObjectRequest.builder()
-                .bucket(bucketName)
-                .key(s3Key)
+    /** Download a file from the bucket and return its bytes. */
+    public byte[] downloadFile(String key) {
+        DownloadRequest request = DownloadRequest.builder()
+                .withKey(key)
                 .build();
 
-        ResponseBytes<GetObjectResponse> response = s3.getObjectAsBytes(request);
-        log.info("Downloaded s3://{}/{} ({} bytes)", bucketName, s3Key, response.asByteArray().length);
-        return response.asByteArray();
+        ByteArray content = new ByteArray();
+        bucketClient.download(request, content);
+        byte[] bytes = content.getBytes();
+        log.info("Downloaded {}/{} ({} bytes)", bucketName, key, bytes.length);
+        return bytes;
     }
 
     /** List all object keys under a given prefix (e.g., "students/stu001/"). */
     public List<String> listFiles(String prefix) {
-        ListObjectsV2Request request = ListObjectsV2Request.builder()
-                .bucket(bucketName)
-                .prefix(prefix)
+        ListBlobsRequest request = ListBlobsRequest.builder()
+                .withPrefix(prefix)
                 .build();
 
-        ListObjectsV2Response response = s3.listObjectsV2(request);
-        return response.contents().stream()
-                .map(S3Object::key)
-                .toList();
+        List<String> keys = new ArrayList<>();
+        Iterator<BlobInfo> it = bucketClient.list(request);
+        while (it.hasNext()) {
+            keys.add(it.next().getKey());
+        }
+        return keys;
     }
 
-    /** Delete a single object from S3. */
-    public void deleteFile(String s3Key) {
-        s3.deleteObject(DeleteObjectRequest.builder()
-                .bucket(bucketName)
-                .key(s3Key)
-                .build());
-        log.info("Deleted s3://{}/{}", bucketName, s3Key);
+    /** Delete a single object from the bucket. */
+    public void deleteFile(String key) {
+        bucketClient.delete(key, null);
+        log.info("Deleted {}/{}", bucketName, key);
     }
 }

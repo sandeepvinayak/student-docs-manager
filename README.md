@@ -1,6 +1,6 @@
 # Student Document Manager
 
-A small classroom project that demonstrates **Amazon S3** (blobstore) and **Amazon DynamoDB** integration in Java using AWS SDK v2. Upload student assignment files to S3 and track metadata in DynamoDB.
+A small classroom project that demonstrates **Amazon S3** (blobstore) and **Amazon DynamoDB** integration in Java using the Substrate SDK (MultiCloudJ) `BucketClient` and `DocStoreClient`, with the AWS provider. Upload student assignment files to S3 and track metadata in DynamoDB.
 
 ## How It Works
 
@@ -51,7 +51,7 @@ aws dynamodb create-table \
 
 Your credentials need:
 - **S3**: `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject`, `s3:ListBucket`
-- **DynamoDB**: `dynamodb:PutItem`, `dynamodb:GetItem`, `dynamodb:Query`, `dynamodb:DeleteItem`
+- **DynamoDB**: `dynamodb:PutItem`, `dynamodb:BatchGetItem` (used by Substrate `DocStoreClient.get`), `dynamodb:Query`, `dynamodb:DeleteItem`, `dynamodb:DescribeTable` (used by the Substrate query planner)
 
 ## Build
 
@@ -141,13 +141,13 @@ The homework file is gone from both S3 and DynamoDB. Only the essay remains.
 src/main/java/com/classroom/docmanager/
 ├── App.java                              # CLI entry point (parses args, runs commands)
 ├── config/
-│   └── AwsConfig.java                    # AWS client factory (S3, DynamoDB)
+│   └── SubstrateConfig.java              # Substrate client factory (BucketClient, DocStoreClient)
 ├── model/
 │   └── Document.java                     # Plain POJO for document metadata
 └── service/
-    ├── BlobStoreService.java             # S3 operations (upload/download/list/delete)
-    ├── DocumentMetadataService.java      # DynamoDB CRUD using low-level client
-    └── StudentDocumentManager.java       # Orchestrates S3 + DynamoDB together
+    ├── BlobStoreService.java             # Blob store operations via BucketClient
+    ├── DocumentMetadataService.java      # Metadata CRUD via DocStoreClient
+    └── StudentDocumentManager.java       # Orchestrates blob store + docstore together
 
 src/test/java/
 └── StudentDocumentManagerTest.java       # Unit tests with Mockito (6 tests)
@@ -156,6 +156,6 @@ src/test/java/
 ## Tech Stack
 
 - Java 17, Maven
-- AWS SDK v2 (`s3`, `dynamodb`) — low-level client, no beans/annotations
+- Substrate SDK / MultiCloudJ 0.4.12 (`blob-client` + `blob-aws`, `docstore-client` + `docstore-aws`). The provider is chosen by the `SUBSTRATE_PROVIDER` env var (default `aws`) and the region by `SUBSTRATE_REGION` (default `us-west-2`)
 - SLF4J + Logback
 - JUnit 5 + Mockito
