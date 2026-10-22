@@ -10,38 +10,43 @@
     <packaging>jar</packaging>
 
     <name>Student Document Manager</name>
-    <description>Classroom project: Manage student documents with S3 and DynamoDB</description>
+    <description>Classroom project: Manage student documents with Substrate SDK (MultiCloudJ) blob store and docstore</description>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <aws.sdk.version>2.25.16</aws.sdk.version>
+        <multicloudj.version>0.4.12</multicloudj.version>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>software.amazon.awssdk</groupId>
-                <artifactId>bom</artifactId>
-                <version>${aws.sdk.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
     <dependencies>
-        <!-- AWS SDK v2: S3 -->
+        <!-- Substrate SDK (MultiCloudJ): Blob store (portable API) -->
         <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>s3</artifactId>
+            <groupId>com.salesforce.multicloudj</groupId>
+            <artifactId>blob-client</artifactId>
+            <version>${multicloudj.version}</version>
         </dependency>
 
-        <!-- AWS SDK v2: DynamoDB -->
+        <!-- Substrate SDK (MultiCloudJ): Docstore (portable API) -->
         <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>dynamodb</artifactId>
+            <groupId>com.salesforce.multicloudj</groupId>
+            <artifactId>docstore-client</artifactId>
+            <version>${multicloudj.version}</version>
+        </dependency>
+
+        <!-- Substrate SDK provider implementations, discovered at runtime via ServiceLoader.
+             Runtime scope keeps application code provider-neutral. -->
+        <dependency>
+            <groupId>com.salesforce.multicloudj</groupId>
+            <artifactId>blob-aws</artifactId>
+            <version>${multicloudj.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.salesforce.multicloudj</groupId>
+            <artifactId>docstore-aws</artifactId>
+            <version>${multicloudj.version}</version>
+            <scope>runtime</scope>
         </dependency>
 
         <!-- SLF4J + Logback for logging -->
@@ -92,6 +97,8 @@
                         </goals>
                         <configuration>
                             <transformers>
+                                <!-- Merge META-INF/services so Substrate SDK providers are discoverable in the fat JAR -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>com.classroom.docmanager.App</mainClass>
                                 </transformer>

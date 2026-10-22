@@ -1,10 +1,12 @@
 package com.classroom.docmanager;
 
-import com.classroom.docmanager.config.AwsConfig;
+import com.classroom.docmanager.config.SubstrateConfig;
 import com.classroom.docmanager.model.Document;
 import com.classroom.docmanager.service.BlobStoreService;
 import com.classroom.docmanager.service.DocumentMetadataService;
 import com.classroom.docmanager.service.StudentDocumentManager;
+import com.salesforce.multicloudj.blob.client.BucketClient;
+import com.salesforce.multicloudj.docstore.client.DocStoreClient;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -31,10 +33,23 @@ public class App {
             System.exit(1);
         }
 
-        var blobStore = new BlobStoreService(AwsConfig.s3Client(), BUCKET_NAME);
-        var metadataService = new DocumentMetadataService(AwsConfig.dynamoDbClient());
-        var manager = new StudentDocumentManager(blobStore, metadataService);
+        BucketClient bucketClient = SubstrateConfig.bucketClient(BUCKET_NAME);
+        DocStoreClient docStoreClient = SubstrateConfig.docStoreClient();
+        try {
+            run(args, new StudentDocumentManager(
+                    new BlobStoreService(bucketClient),
+                    new DocumentMetadataService(docStoreClient)));
+        } finally {
+            docStoreClient.close();
+            try {
+                bucketClient.close();
+            } catch (Exception e) {
+                System.err.println("Failed to close blob client: " + e.getMessage());
+            }
+        }
+    }
 
+    private static void run(String[] args, StudentDocumentManager manager) throws IOException {
         String command = args[0].toLowerCase();
 
         switch (command) {
