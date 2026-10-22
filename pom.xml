@@ -10,38 +10,40 @@
     <packaging>jar</packaging>
 
     <name>Student Document Manager</name>
-    <description>Classroom project: Manage student documents with S3 and DynamoDB</description>
+    <description>Classroom project: Manage student documents with Substrate SDK blob store and docstore</description>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <aws.sdk.version>2.25.16</aws.sdk.version>
+        <multicloudj.version>0.4.12</multicloudj.version>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>software.amazon.awssdk</groupId>
-                <artifactId>bom</artifactId>
-                <version>${aws.sdk.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
     <dependencies>
-        <!-- AWS SDK v2: S3 -->
+        <!-- Substrate SDK (MultiCloudJ): Blob store (replaces AWS SDK S3) -->
         <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>s3</artifactId>
+            <groupId>com.salesforce.multicloudj</groupId>
+            <artifactId>blob-client</artifactId>
+            <version>${multicloudj.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.salesforce.multicloudj</groupId>
+            <artifactId>blob-aws</artifactId>
+            <version>${multicloudj.version}</version>
+            <scope>runtime</scope>
         </dependency>
 
-        <!-- AWS SDK v2: DynamoDB -->
+        <!-- Substrate SDK (MultiCloudJ): DocStore (replaces AWS SDK DynamoDB) -->
         <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>dynamodb</artifactId>
+            <groupId>com.salesforce.multicloudj</groupId>
+            <artifactId>docstore-client</artifactId>
+            <version>${multicloudj.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.salesforce.multicloudj</groupId>
+            <artifactId>docstore-aws</artifactId>
+            <version>${multicloudj.version}</version>
+            <scope>runtime</scope>
         </dependency>
 
         <!-- SLF4J + Logback for logging -->
@@ -95,6 +97,8 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>com.classroom.docmanager.App</mainClass>
                                 </transformer>
+                                <!-- Merge META-INF/services so Substrate providers are discoverable via ServiceLoader -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                         </configuration>

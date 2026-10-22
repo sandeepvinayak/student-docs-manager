@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * High-level orchestrator that coordinates S3 (blobstore) and DynamoDB operations.
+ * High-level orchestrator that coordinates blob store and document store (Substrate SDK) operations.
  * This is the main entry point for business logic.
  */
 public class StudentDocumentManager {
@@ -29,8 +29,8 @@ public class StudentDocumentManager {
 
     /**
      * Upload a student's assignment file:
-     *  1. Upload the file to S3 under students/{studentId}/{uuid}_{filename}
-     *  2. Save metadata to DynamoDB
+     *  1. Upload the file to the blob store under students/{studentId}/{uuid}_{filename}
+     *  2. Save metadata to the document store
      */
     public Document uploadAssignment(String studentId, Path filePath) throws IOException {
         String fileName = filePath.getFileName().toString();
@@ -39,10 +39,10 @@ public class StudentDocumentManager {
         String contentType = Files.probeContentType(filePath);
         long fileSize = Files.size(filePath);
 
-        // Step 1: Upload to S3
+        // Step 1: Upload to blob store
         blobStore.uploadFile(s3Key, filePath, contentType != null ? contentType : "application/octet-stream");
 
-        // Step 2: Save metadata to DynamoDB
+        // Step 2: Save metadata to the document store
         Document doc = new Document();
         doc.setStudentId(studentId);
         doc.setDocumentId(documentId);
@@ -58,7 +58,7 @@ public class StudentDocumentManager {
         return doc;
     }
 
-    /** Download a student's document by looking up the S3 key in DynamoDB. */
+    /** Download a student's document by looking up the blob key in the document store. */
     public byte[] downloadAssignment(String studentId, String documentId) {
         Document doc = metadataService.getDocument(studentId, documentId);
         if (doc == null) {
@@ -73,7 +73,7 @@ public class StudentDocumentManager {
         return metadataService.listDocumentsByStudent(studentId);
     }
 
-    /** Delete a student's document from both S3 and DynamoDB. */
+    /** Delete a student's document from both the blob store and the document store. */
     public void deleteAssignment(String studentId, String documentId) {
         Document doc = metadataService.getDocument(studentId, documentId);
         if (doc != null) {

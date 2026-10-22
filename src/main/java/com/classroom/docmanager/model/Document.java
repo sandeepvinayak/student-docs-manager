@@ -2,7 +2,7 @@ package com.classroom.docmanager.model;
 
 /**
  * Plain POJO representing a student document's metadata.
- * No framework annotations — manual mapping to/from DynamoDB attribute maps.
+ * No framework annotations — mapped directly by the Substrate SDK DocStore codec.
  */
 public class Document {
 
